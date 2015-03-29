@@ -13,7 +13,11 @@ if ($max > 0) { $use_max = 1; $curr_max = $max; }
 open IN1, "<$in1" or die;
 open IN2, "<$in2" or die;
 
+my $line_count = 0;
+
 while(<IN1>) {
+
+        $line_count++;
 
         $curr_max--;
 
@@ -40,7 +44,12 @@ while(<IN1>) {
 
         if ($use_max) { last if ($curr_max <= 0); }
 
+        # print status
+        print "." if ($line_count % 1000 == 0);
+
 }
+
+print "\n";
 
 foreach my $name (keys %{$d}) {
         foreach my $flag (keys %{$d->{$name}}) {
