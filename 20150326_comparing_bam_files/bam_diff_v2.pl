@@ -1,6 +1,6 @@
 use strict;
 
-# time perl bam_diff.pl first.bam second.bam 0
+# time perl bam_diff_v2.pl /drive/bam_2.6.0/c1cbdef5-4564-4444-a4b5-d48f87beb410/2d1f4e651ad13b3a9c1d3ceceaaaa1d3.bam /drive/bam_2.6.1/1da94974-e018-4af7-a34b-de4701d324d5/ec1dbea57e3bbb155f7ea6f42cfd6b91.bam 0
 
 my ($in1, $in2, $max) = @ARGV;
 
@@ -61,7 +61,7 @@ foreach my $chr (@chrs) {
           if ($use_max) { last if ($curr_max <= 0); }
 
           # print status
-          print STDERR "." if ($line_count % 1000 == 0);
+          print STDERR "." if ($line_count % 100000 == 0);
 
   }
 
