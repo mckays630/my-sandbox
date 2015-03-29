@@ -45,7 +45,7 @@ while(<IN1>) {
         if ($use_max) { last if ($curr_max <= 0); }
 
         # print status
-        print "." if ($line_count % 1000 == 0);
+        print STDERR "." if ($line_count % 1000 == 0);
 
 }
 
