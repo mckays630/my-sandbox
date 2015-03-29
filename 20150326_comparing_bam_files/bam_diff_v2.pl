@@ -11,7 +11,7 @@ my $curr_max = 0;
 if ($max > 0) { $use_max = 1; $curr_max = $max; }
 
 my @chrs;
-for (my $i=1; $i<23; $i++) {
+for (my $i=22; $i>0; $i--) {
   push @chrs, "$i";
 }
 push @chrs, "X";
