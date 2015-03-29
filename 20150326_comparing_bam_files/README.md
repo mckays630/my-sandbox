@@ -10,6 +10,8 @@ equivalents reads to mark as duplicates.
 
 ## Run Comparison
 
-  time perl bam_diff.pl chr22.1.sam chr22.2.sam > report.txt
+  time perl bam_diff.pl chr22.1.sam chr22.2.sam 0 > report.txt
 
 ## Interpret Results
+
+  print "$name\t$flag\t$chr\t$pos\t".$d->{$name}{$flag}{$chr}{$pos}."\n";
