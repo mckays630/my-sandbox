@@ -1,16 +1,12 @@
 # BAM Diff
 
-A simple diff tool, uses SAM files for easy parsing, that reports differences between
+A simple diff tool that reports differences between
 two BAMs.  Ignores the mark duplicates flag since tools can randomly choose
 equivalents reads to mark as duplicates.
 
-## Prepare BAMs
-
-  samtools view foo.bam chr22 > chr22.sam
-
 ## Run Comparison
 
-time perl bam_diff.pl /drive/bam_2.6.0/c1cbdef5-4564-4444-a4b5-d48f87beb410/temp.sam /drive/bam_2.6.1/1da94974-e018-4af7-a34b-de4701d324d5/temp.sam 0 > run_log.txt
+  time perl bam_diff_v2.pl /drive/bam_2.6.0/c1cbdef5-4564-4444-a4b5-d48f87beb410/2d1f4e651ad13b3a9c1d3ceceaaaa1d3.bam /drive/bam_2.6.1/1da94974-e018-4af7-a34b-de4701d324d5/ec1dbea57e3bbb155f7ea6f42cfd6b91.bam 0
 
 ## Interpret Results
 
