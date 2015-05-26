@@ -1,0 +1,9 @@
+@HD	VN:1.4
+@RG	ID:CRUK-CI:LP6007504-DNA_A01	CN:CRUK-CI	PL:ILLUMINA	PM:Illumina HiSeq 2000	LB:WGS:CRUK-CI:LP6007504-DNA_A01	PI:0	SM:ce799e7b-30e7-44a5-a185-3e50d5e059ef	PU:CRUK-CI:LP6007504-DNA_A01_6	DT:2014-07-24T00:00:00+00:00
+@CO	dcc_project_code:ESAD-UK
+@CO	submitter_donor_id:OCCAMS-AH-021
+@CO	submitter_specimen_id:COU1-0084-lesion-30.3.11-A*
+@CO	submitter_sample_id:LP6007504-DNA_A01
+@CO	dcc_specimen_type:Primary tumour - solid tissue
+@CO	use_cntl:N/A
+@PG	ID:bamreset	PN:bamreset	CL:bamreset exclude=QCFAIL,SECONDARY,SUPPLEMENTARY resetheadertext=HS2000-1321_76.6_header.txt md5=1 md5filename=HS2000-1321_76.6_cleaned.bam.md5	VN:0.0.147

@@ -1,0 +1,9 @@
+@HD	VN:1.4
+@RG	ID:CRUK-CI:LP6007566-DNA_A01	CN:CRUK-CI	PL:ILLUMINA	PM:Illumina HiSeq 2000	LB:WGS:CRUK-CI:LP6007566-DNA_A01	PI:0	SM:92e9bd62-c3fb-4c15-beb9-ba0a6e11703b	PU:CRUK-CI:LP6007566-DNA_A01_3	DT:2014-07-24T00:00:00+00:00
+@CO	dcc_project_code:ESAD-UK
+@CO	submitter_donor_id:OCCAMS-AH-021
+@CO	submitter_specimen_id:OC-AH-021-B-F1
+@CO	submitter_sample_id:LP6007566-DNA_A01
+@CO	dcc_specimen_type:Normal - blood derived
+@CO	use_cntl:N/A
+@PG	ID:bamreset	PN:bamreset	CL:bamreset exclude=QCFAIL,SECONDARY,SUPPLEMENTARY resetheadertext=HS2000-1325_66.3_header.txt md5=1 md5filename=HS2000-1325_66.3_cleaned.bam.md5	VN:0.0.147
