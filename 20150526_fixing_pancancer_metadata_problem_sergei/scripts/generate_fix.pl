@@ -46,6 +46,7 @@ foreach my $file (@files) {
 # now iterate over the index and make corrections where needed
 # also track the number needing changes and the number finally changed
 
+open OUT, "| gzip -c > output.json.gz" or die;
 
 open IN, "gunzip -c donor_p_150526020206.jsonl.gz | " or die "Can't open donor_p_150526020206.jsonl.gz";
 
@@ -72,6 +73,20 @@ while (<IN>) {
 
   print "NOT BROKEN: $broken\n" if (!$broken);
 
+  # if it's broken, need to fix the mapping and save out
+
+  if ($broken) {
+    for (my $i=0; $i<scalar(@{$jd->{normal_specimen}{alignment}{qc_metrics}}); $i++) {
+      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
+      $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'} = $pu_to_rg->{$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}};
+      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics}; die;
+    }
+  }
+
+  # LEFT OFF WITH: doesn't seem to work, read group isn't getting mapped to new value correctly
+
+  # now just print everything
+  print OUT encode_json($jd) . "\n";
 
 
 # if (/ce799e7b-30e7-44a5-a185-3e50d5e059ef/) {
@@ -85,3 +100,5 @@ while (<IN>) {
 }
 
 close IN;
+
+close OUT;
