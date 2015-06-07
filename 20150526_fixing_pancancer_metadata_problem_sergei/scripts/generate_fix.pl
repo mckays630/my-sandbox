@@ -4,6 +4,11 @@ use Data::Dumper;
 
 $|++;
 
+# global counts
+my $broken_cnt = 0;
+my $broken_not_fix = 0;
+my $broken_fixed = 0;
+
 if (!-e "donor_p_150526020206.jsonl.gz") { system("wget http://pancancer.info/gnos_metadata/2015-05-26_02-02-06_UTC/donor_p_150526020206.jsonl.gz"); }
 
 # map platform unit to read group, should be one-to-one
@@ -76,29 +81,47 @@ while (<IN>) {
   # if it's broken, need to fix the mapping and save out
 
   if ($broken) {
-    for (my $i=0; $i<scalar(@{$jd->{normal_specimen}{alignment}{qc_metrics}}); $i++) {
-      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
-      $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'} = $pu_to_rg->{$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}};
-      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics}; die;
-    }
-  }
 
-  # LEFT OFF WITH: doesn't seem to work, read group isn't getting mapped to new value correctly
+    my $rg_fixed = 0;
+    my $rg_not_fixed = 0;
+
+    $broken_cnt++;
+
+    for (my $i=0; $i<scalar(@{$jd->{normal_specimen}{alignment}{qc_metrics}}); $i++) {
+      #print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
+      print "PU: ".$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}."\n";
+      print "RG: ".$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'}."\n";
+      print "NEW RG: ".$pu_to_rg->{$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}}."\n";
+
+      if ($pu_to_rg->{$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}} ne '') {
+        $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'} = $pu_to_rg->{$jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'}};
+        $rg_fixed = 1;
+        print "FIXING!";
+
+      } else {
+        print "CAN'T FIX, NO MAPPTING INFORMATION\n";
+        $rg_not_fixed = 1;
+      }
+
+    }
+
+    if ($rg_fixed) {
+      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
+    }
+
+    # now add back to global
+    $broken_fixed += $rg_fixed;
+    $broken_not_fix += $rg_not_fixed;
+  }
 
   # now just print everything
   print OUT encode_json($jd) . "\n";
-
-
-# if (/ce799e7b-30e7-44a5-a185-3e50d5e059ef/) {
-#    my $jd = decode_json ($_);
-#    print Dumper $jd;
-#
-#    print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
-#  }
-
 
 }
 
 close IN;
 
 close OUT;
+
+# summary
+print "SUMMARY: BROKEN: $broken FIXED: $broken_fixed NOT FIXED: $broken_not_fix\n";
