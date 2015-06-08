@@ -106,7 +106,7 @@ while (<IN>) {
     }
 
     if ($rg_fixed) {
-      print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
+      #print Dumper $jd->{normal_specimen}{alignment}{qc_metrics};
     }
 
     # now add back to global
@@ -124,4 +124,4 @@ close IN;
 close OUT;
 
 # summary
-print "SUMMARY: BROKEN: $broken FIXED: $broken_fixed NOT FIXED: $broken_not_fix\n";
+print "SUMMARY: BROKEN: $broken_cnt FIXED: $broken_fixed NOT FIXED: $broken_not_fix\n";
