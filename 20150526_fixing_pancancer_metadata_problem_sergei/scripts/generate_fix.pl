@@ -137,7 +137,6 @@ while (<IN>) {
 		  $qc_xml->{read_group_id} = $new_rg;
 		  $qc_xml->{metrics}->{readgroup} = $new_rg;
 		  $rg_fixed++;
-		  say join("\t","METADATA_FIXED",$donor,$url);
 	      } 
 	      else {
 		  my $reason;
@@ -148,7 +147,6 @@ while (<IN>) {
 		      $reason = 'NOT-UNIQUE';
 		  }
 		  $broken{$specimen}{$donor}++;
-		  say join("\t","METADATA_BROKEN",$donor,$url);
 		  say join("\t",'RG_BROKEN', $donor, $pcode, $pu, $rg, $new_rg, $specimen, $reason);
 	      }
 	  }
