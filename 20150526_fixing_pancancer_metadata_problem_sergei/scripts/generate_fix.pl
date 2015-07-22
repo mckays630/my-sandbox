@@ -1,28 +1,31 @@
 #!/usr/bin/perl
 use common::sense;
 use JSON;
+use XML::Simple;
 use Data::Dumper;
 
 $|++;
 
-# global counts
-my $broken_cnt = 0;
-my $broken_not_fix = 0;
-my $broken_fixed = 0;
-my %seen_pu;
 
+use constant INDEX => 'donor_p_150720020205.jsonl.gz';
 
-use constant INDEX => 'donor_p_150716020204.jsonl.gz';
 my $index = INDEX;
+my ($date) = $index =~ /donor_p_(\d+)\./;
+$date =~ s/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/20$1-$2-$3\_$4-$5-$6\_UTC/;
 
 if (!-e $index || -z $index) { 
     say "Downloading $index...";
-    say("curl http://pancancer.info/gnos_metadata/2015-07-16_02-02-04_UTC/$index > $index 2>/dev/null"); 
+    system("curl http://pancancer.info/gnos_metadata/$date/$index > $index 2>/dev/null"); 
 }
 
 # map platform unit to read group, should be one-to-one
 my $pu_to_rg = {};
-my %pu;
+my %all_pu;
+my %bad_pu;
+my %donor;
+my %project;
+my %fixed;
+my %broken;
 
 # parse out the info from the BAM headers
 die "Where is the data folder?" unless -d 'data';
@@ -34,147 +37,209 @@ while (<D>) {
 }
 close D;
 
-my %line;
-my %file;
-my %bad_pu;
-foreach my $file (@files) {
+my %seen_file;
+for my $file (@files) {
+    chomp(my $fname = `basename $file`);
+    say STDERR "I have already seen file $fname" and next if $seen_file{$fname}++;
 
-  #print "PROCESSING FILE: $file\n";
-
-  open IN, "<$file" or die;
-  while(<IN>) {
-    chomp;
-    if (/^\@RG/) {
-	my @a = split /\t/;
-	
-	my ($pu) = /PU:(\S+)/;
-	my ($rg) = /ID:(\S+)/;
-	die "NO PU!" unless $pu;
-	die "NO RG!" unless $rg;
-
-	say STDERR "NON UNIQUE PLATFORM UNIT TO READGROUP! PU='$pu' RG='$rg' ARCHIVE='". $pu_to_rg->{$pu}."'" 
-	if ($pu_to_rg->{$pu} && $pu_to_rg->{$pu} ne $rg) {
-	    push $bad_pu{$pu}++;
-	}
-	else {
+    open IN, "<$file" or die;
+    while(<IN>) {
+	chomp;
+	if (/^\@RG/) {
+	    my ($pu) = /PU:(\S+)/;
+	    my ($rg) = /ID:(\S+)/;
+	    die "NO PU!" unless $pu;
+	    die "NO RG!" unless $rg;
+	    
+	    $all_pu{$pu}++;
+	    
+	    if ($pu_to_rg->{$pu} && $pu_to_rg->{$pu} ne $rg) {
+		$bad_pu{$pu}++;
+	    }
+	    
 	    $pu_to_rg->{$pu} = $rg;
 	}
-	
-	$pu{$pu}{rg}{$rg}++;
-	push @{$line{$pu}}, $_;
-	$file{$_} = $file;
     }
-  }
-  close IN;
+    close IN;
 }
 
 
-my $total_pus = keys %pu;
+my $total_pus = keys %all_pu;
 
 for my $pu (keys %bad_pu) {
+    say STDERR "Deleting duplicated PU $pu";
     delete $pu_to_rg->{$pu};
 }
-
 
 # now iterate over the index and make corrections where needed
 # also track the number needing changes and the number finally changed
 
-open OUT, "| gzip -c > output.json.gz" or die;
-
 open IN, "gunzip -c $index | " or die "Can't open $index";
 
-my @to_download;
-
 while (<IN>) {
+  my $json = decode_json($_);
 
-  my $jd = decode_json($_);
+  my $donor = $json->{donor_unique_id};
+  my $pcode = $json->{dcc_project_code};
 
-  die Dumper $jd;
+  my @jds = ($json->{normal_specimen});
+  push @jds, @{$json->{aligned_tumor_specimens}};
 
-  # does this one need repairs???
-  my $seen = {};
-  my $broken = 0;
+  my $specimen;
+  for my $jd (@jds) {
+      $specimen = $specimen ? 'TUMOR' : 'NORMAL';
 
-  # broken flag triggered if read_group_id is duplicated.
-  for my $qc_entry (@{$jd->{normal_specimen}{alignment}{qc_metrics}}) {
-      $broken = $seen->{$qc_entry->{read_group_id}}++;
-  }
+      my $seen = {};
+      my $broken = 0;
 
-  print "BROKEN: $broken\n" if ($broken);
-
-  # if it's broken, need to fix the mapping and save out
-  if ($broken) {
-      my $donor = $jd->{donor_unique_id};
-      my $pcode = $jd->{dcc_project_code};
-      push @to_download, $jd->{normal_specimen};
-      my $rg_fixed = 0;
-      my $rg_not_fixed = 0;
-
-      $broken_cnt++;
-
-      for (my $i=0; $i<scalar(@{$jd->{normal_specimen}{alignment}{qc_metrics}}); $i++) {
-	  my $pu = $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'metrics'}{'platform_unit'};
-	  my $rg = $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'};
-
-	  say "PU: $pu";
-	  say "RG: $rg";
-	  say "NEW RG: ".$pu_to_rg->{$pu} || "NOT FOUND";
-
-	  if ($pu{$pu}) {
-	      $pu{$pu}{donor} = $donor;
-	      $pu{$pu}{dcc_project_code} = $pcode;
-	  }
-	  
-	  if ($pu_to_rg->{$pu}) {
-	      $jd->{normal_specimen}{alignment}{qc_metrics}[$i]{'read_group_id'} = $pu_to_rg->{$pu};
-	      $rg_fixed = 1;
-	      say join("\t",'DONOR_FIXED', $pu, $rg, $donor);
-	      
-	  } else {
-	      $rg_not_fixed = 1;
-	      say join("\t",'DONOR_BROKEN', $pu, $rg, $donor);
-	  }
-	  
+      # broken flag triggered if read_group_id is duplicated.
+      for my $qc_entry (@{$jd->{alignment}{qc_metrics}}) {
+	  $broken = $seen->{$qc_entry->{read_group_id}}++;
       }
       
-      # now add back to global
-      $broken_fixed += $rg_fixed;
-      $broken_not_fix += $rg_not_fixed;
+      # if it's broken, need to fix the mapping and save out
+      if ($broken) {
+	  my ($repo,$xml_file,$url) = get_metadata_xml($jd);
+	  
+	  my $fixed_path  = "qc_metadata/fixed/$repo";
+	  my $broken_path = "qc_metadata/broken/$repo"; 
+	  system "mkdir -p $fixed_path";
+	  
+	  # Get the parts of the XML we need to mend.  Thankfully, they are literal JSON strings.
+	  my $xml = XMLin("$broken_path/$xml_file") or die $!;
+	  my $atts = $xml->{Result}->{analysis_xml}->{ANALYSIS_SET}->{ANALYSIS}->{ANALYSIS_ATTRIBUTES}->{ANALYSIS_ATTRIBUTE};
+	  my $raw_qc_metrics = tag_value($atts,'qc_metrics');
+	  my $qc_metrics = decode_json($raw_qc_metrics);
+	  
+	  my $rg_fixed;
+
+	  my $num = my @qcm = @{$jd->{alignment}{qc_metrics}};
+	  for (my $i = 0;$i < $num;$i++) {
+	      my $qcm = $qcm[$i];
+	      
+	      my $qc_xml = $qc_metrics->{qc_metrics}->[$i];
+	      
+	      my $pu = $qcm->{'metrics'}{'platform_unit'};
+	      my $rg = $qcm->{'read_group_id'};
+	      my $new_rg = $pu_to_rg->{$pu} || '';
+
+	      next if $new_rg && $new_rg eq $rg;
+	      
+	      my $xml1_pu  = $qc_xml->{metrics}->{platform_unit} || "HUH?";
+	      die "XML and JSON PUs do not match $pu $xml1_pu" unless $xml1_pu eq $pu;
+	      
+	      $donor{$pu}   = $donor;
+	      $project{$pu} = $pcode;
+	      
+	      if ($new_rg) {
+		  $fixed{$specimen}{$donor}++;
+		  say join("\t",'RG_FIXED', $donor, $pcode, $pu, $rg, $new_rg, $specimen);
+		  $qc_xml->{read_group_id} = $new_rg;
+		  $qc_xml->{metrics}->{readgroup} = $new_rg;
+		  $rg_fixed++;
+		  say join("\t","METADATA_FIXED",$donor,$url);
+	      } 
+	      else {
+		  my $reason;
+		  if (!$all_pu{$pu}) {
+		      $reason = 'NOT SEEN';
+		  }
+		  elsif ($bad_pu{$pu}) {
+		      $reason = 'NOT-UNIQUE';
+		  }
+		  $broken{$specimen}{$donor}++;
+		  say join("\t","METADATA_BROKEN",$donor,$url);
+		  say join("\t",'RG_BROKEN', $donor, $pcode, $pu, $rg, $new_rg, $specimen, $reason);
+	      }
+	  }
+	  
+	  if ($rg_fixed) {
+	      my $fixed_qc_metrics = encode_json($qc_metrics);
+	      
+	      my $out_file = "$fixed_path/$xml_file";
+	      my $in_file  = "$broken_path/$xml_file";
+	      open INXML, $in_file or die "Could not open $in_file: $!";
+	      open OUTXML, ">$out_file" or die "Could not open $out_file: $!";
+	      
+	      while (<INXML>) {
+		  if (/qc_metrics/ && /<VALUE>/) {
+		      my ($space) = /^(\s+)/;;
+		      $_ = qq($space<VALUE>$fixed_qc_metrics</VALUE>\n);
+		  }
+		  print OUTXML $_;
+	      }
+	      close OUTXML;
+	      close INXML;
+	  }
+      }
   }
-  
-  # now just print everything
-  print OUT encode_json($jd) . "\n";
-  
 }
 
 close IN;
 
-close OUT;
+my $normal_fixed  = keys %{$fixed{NORMAL}};
+my $normal_broken = keys %{$broken{NORMAL}};
+my $normal_total  = $normal_fixed + $normal_broken; 
+my $tumor_fixed   = keys %{$fixed{TUMOR}};
+my $tumor_broken  = keys %{$broken{TUMOR}};
+my $tumor_total   = $tumor_fixed + $tumor_broken;
 
-# summary
-print "SUMMARY: BROKEN: $broken_cnt FIXED: $broken_fixed NOT FIXED: $broken_not_fix\n";
+my %broken_donors = (%{$broken{NORMAL}}, %{$broken{TUMOR}});
+my %fixed_donors = (%{$fixed{NORMAL}}, %{$fixed{TUMOR}});
 
+my $total_fixed   = keys %fixed_donors;
+my $total_broken  = keys %broken_donors;
+my $total_total   = $total_fixed + $total_broken;
 
-for my $xml (@to_download) {
-    get_metadata_xml($xml);
+say "DONOR SUMMARY:";
+say "NORMAL: TOTAL: $normal_total BROKEN: $normal_broken FIXED: $normal_fixed";
+say "TUMOR:  TOTAL: $tumor_total BROKEN: $tumor_broken FIXED: $tumor_fixed";
+say "TOTAL:  TOTAL: $total_total BROKEN: $total_broken FIXED: $total_fixed";
+
+say "BAD PUs:";
+for my $pu (sort keys %bad_pu) {
+    say join("\t",$pu,$donor{$pu}||'.',$project{$pu}||'.');
 }
-
-
 
 sub get_metadata_xml {
     my $h = shift;
+
     my $url = $h->{'gnos_metadata_url'};
     my ($repo) = $url =~ m!//([^/]+)!;
     my ($id)   = $url =~ m!analysisFull/(\S+)!;
-    $id or die "NO ID $url";
-    system "mkdir -p $repo";
-    next if -e "$repo/$id.xml" && ! -z "$repo/$id.xml";;
-    my $retval = system "curl $url > $repo/$id.xml"; 
-    if ($retval) {
+    $id or die "NO ID for $url";
+
+    my $path = "qc_metadata/broken/$repo";
+    system "mkdir -p $path";
+    my $xml_file = "$path/$id.xml";
+
+    system "cp $repo/$id.xml $path" if -e "$repo/$id.xml" && ! -z "$repo/$id.xml"; 
+
+    return ($repo, "$id.xml", $url) if -e $xml_file && ! -z $xml_file;
+
+    say "Dowloading $xml_file...";
+    my $retval = system "curl $url > $xml_file 2>/dev/null"; 
+
+    if ($retval || ! -e $xml_file || -z $xml_file) {
 	say "Problem with $url, I will retry";
 	$retval = system "curl $url > $repo/$id.xml";
     }
-    if ($retval) {
+    if ($retval || ! -e $xml_file || -z $xml_file) {
 	say "OK, I give up on this one for now";
+    }
+
+    return ($repo, "$id.xml", $url);
+}
+
+
+sub tag_value {
+    my $array = shift;
+    my $tag   = shift;
+    my $value = shift;
+
+    for (@$array) {
+	next unless $_->{TAG} eq $tag;
+	$_->{VALUE} = $value if $value;
+	return $_->{VALUE};
     }
 }
